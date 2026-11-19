@@ -194,6 +194,19 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--card);border:1px
   .rv{opacity:1;transform:none}
   .dot.on i{width:100%}
 }
+/* reservar mesa */
+.hero .wrap>*:nth-child(5){animation-delay:.4s}
+.cta{background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:99px;padding:12px 24px;font-weight:700;letter-spacing:.04em;transition:background .25s,color .25s}
+.cta:hover,.cta:active{background:var(--gold);color:#1b1305}
+.lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0}
+.tbl-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--muted);transition:border-color .2s,background .2s,color .2s}
+.tbl svg{width:100%;max-width:58px;height:auto}
+.tbl.on{border-color:var(--gold);background:rgba(214,176,106,.13);color:var(--cream)}
+.pax{display:flex;flex-wrap:wrap;gap:8px}
+.pill{border:1px solid var(--line);background:transparent;border-radius:99px;min-width:44px;height:40px;padding:0 14px;color:var(--muted);transition:background .2s,color .2s,border-color .2s}
+.pill.on{background:var(--gold);color:#1b1305;border-color:var(--gold);font-weight:700}
+.rsec{display:flex;flex-direction:column;gap:8px}
 .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:120;background:var(--card);border:1px solid var(--gold);color:var(--cream);border-radius:12px;padding:10px 16px;max-width:90vw;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .add[disabled],.send.dis{opacity:.5;pointer-events:none}
 </style>
@@ -431,7 +444,7 @@ function cartTotal(){var t=0;for(var k in cart){var d=dish(k);if(d)t+=d.preco*ca
 
 function build(){
   var html='';
-  html+='<header class="hero"><div class="wrap"><span class="brand">Maré e Brasa</span><h1>Do mar à <em>brasa</em>, direto à mesa.</h1><p>Escolhe os pratos, indica a tua mesa e envia o pedido para o WhatsApp do restaurante.</p><div class="chips-info"><span>Maputo, Moçambique</span><span>Marisco e grelhados</span></div></div></header>';
+  html+='<header class="hero"><div class="wrap"><span class="brand">Maré e Brasa</span><h1>Do mar à <em>brasa</em>, direto à mesa.</h1><p>Escolhe os pratos, indica a tua mesa e envia o pedido para o WhatsApp do restaurante.</p><div class="chips-info"><span>Maputo, Moçambique</span><span>Marisco e grelhados</span></div><div><button class="cta" type="button" data-a="reserve">Reservar mesa</button></div></div></header>';
   html+='<div class="bar"><div class="wrap" id="barwrap"></div></div>';
   html+='<div class="wrap"><main id="main"></main><footer><span class="brand">Maré e Brasa</span><span>Uma experiência de sabor.</span><button class="manage" data-a="manage" id="manage"></button></footer></div>';
   html+='<div class="cartbar" id="cartbar"></div><div id="sheetroot"></div>';
@@ -515,7 +528,7 @@ function openCart(){
    '<div id="cartItems"></div>'+
    '<div class="two"><div class="f"><label for="f-mesa">Mesa</label><input id="f-mesa" inputmode="numeric" maxlength="4" placeholder="Ex.: 8" value="'+esc(form.mesa)+'"></div>'+
    '<div class="f"><label for="f-pes">Pessoas</label><input id="f-pes" type="number" min="1" max="30" inputmode="numeric" value="'+form.pessoas+'"></div></div>'+
-   '<div class="f"><label for="f-nome">O teu nome</label><input id="f-nome" autocomplete="given-name" placeholder="Ex.: Edmilson" value="'+esc(form.nome)+'"></div>'+
+   '<div class="f"><label for="f-nome">O teu nome</label><input id="f-nome" autocomplete="given-name" value="'+esc(form.nome)+'"></div>'+
    '<div class="f"><label for="f-obs">Observações (opcional)</label><textarea id="f-obs" placeholder="Ex.: sem picante">'+esc(form.obs)+'</textarea></div>'+
    '<details><summary>Ver a mensagem que será enviada</summary><pre id="preview"></pre></details>'+
    '<p class="err" id="ferr"></p>'+
@@ -553,6 +566,97 @@ function refreshSend(){
     $('#ferr').textContent=err;
     if(err){e.preventDefault();var f=$(!String(form.mesa).trim()?'#f-mesa':'#f-nome');if(f)f.focus();}
   };
+}
+
+/* ---------- reservar mesa ---------- */
+var HORA_ABRE = 11, HORA_FECHA = 22;   // horário das reservas (primeira e última hora); ajusta aqui
+var DIAS = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+var MESAS = {round:'Redonda',square:'Quadrada',long:'Comprida',any:'Tanto faz'};
+var rform = {mesa:'any',pessoas:2,mais:8,data:'',hora:'',nome:'',obs:''};
+function pad(n){return (n<10?'0':'')+n;}
+function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function addDays(n){var d=new Date();d.setDate(d.getDate()+n);return d;}
+function parseYmd(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function tblArt(k){
+  var T='#d6b06a', C='#f6efe0', s='<svg viewBox="0 0 64 64" aria-hidden="true">';
+  if(k==='round'){
+    s+='<circle cx="32" cy="32" r="14" fill="'+T+'"/>';
+    [[32,10],[32,54],[10,32],[54,32]].forEach(function(p){s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="5" fill="'+C+'" opacity=".85"/>';});
+  }else if(k==='square'){
+    s+='<rect x="20" y="20" width="24" height="24" rx="3" fill="'+T+'"/>';
+    [[26,9,12,6],[26,49,12,6],[9,26,6,12],[49,26,6,12]].forEach(function(r){s+='<rect x="'+r[0]+'" y="'+r[1]+'" width="'+r[2]+'" height="'+r[3]+'" rx="3" fill="'+C+'" opacity=".85"/>';});
+  }else if(k==='long'){
+    s+='<rect x="8" y="22" width="48" height="20" rx="3" fill="'+T+'"/>';
+    [[13,11],[39,11],[13,47],[39,47]].forEach(function(p){s+='<rect x="'+p[0]+'" y="'+p[1]+'" width="12" height="6" rx="3" fill="'+C+'" opacity=".85"/>';});
+  }else{
+    s+='<circle cx="32" cy="32" r="18" fill="none" stroke="'+T+'" stroke-width="2" stroke-dasharray="4 4"/><circle cx="24" cy="32" r="2.5" fill="'+C+'"/><circle cx="32" cy="32" r="2.5" fill="'+C+'"/><circle cx="40" cy="32" r="2.5" fill="'+C+'"/>';
+  }
+  return s+'</svg>';
+}
+function resCount(){return rform.pessoas===7?Math.max(7,Math.min(50,parseInt(rform.mais,10)||7)):rform.pessoas;}
+function resMessage(){
+  var dt='—';
+  if(rform.data){var d=parseYmd(rform.data);dt=DIAS[d.getDay()]+', '+pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();}
+  var l=['NOVA RESERVA — MARÉ E BRASA','','Nome: '+rform.nome.trim(),'Número de pessoas: '+resCount(),'Data: '+dt,'Hora: '+(rform.hora||'—'),'Mesa: '+MESAS[rform.mesa]];
+  if(rform.obs.trim()) l.push('Observações: '+rform.obs.trim());
+  return l.join('\n');
+}
+function fillTimes(){
+  var sel=$('#r-hora'); if(!sel) return;
+  var now=new Date(), today=rform.data===ymd(now), opts=[];
+  for(var h=HORA_ABRE;h<=HORA_FECHA;h++){
+    [0,30].forEach(function(m){
+      if(h===HORA_FECHA&&m===30) return;
+      if(today&&(h*60+m)<=now.getHours()*60+now.getMinutes()+30) return;
+      opts.push(pad(h)+':'+pad(m));
+    });
+  }
+  if(opts.indexOf(rform.hora)<0) rform.hora='';
+  sel.innerHTML='<option value="">'+(opts.length?'Escolhe a hora':'Sem horários para hoje')+'</option>'+opts.map(function(o){return '<option'+(o===rform.hora?' selected':'')+'>'+o+'</option>';}).join('');
+}
+function refreshRes(){
+  var s=$('#rsend'); if(!s) return;
+  document.querySelectorAll('[data-a=rtable]').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-id')===rform.mesa);});
+  document.querySelectorAll('[data-a=rpax]').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-id')===rform.pessoas);});
+  document.querySelectorAll('[data-a=rday]').forEach(function(b){b.classList.toggle('on',rform.data===ymd(addDays(+b.getAttribute('data-id'))));});
+  $('#r-moref').hidden=rform.pessoas!==7;
+  s.href='https://wa.me/'+WA+'?text='+encodeURIComponent(resMessage());
+  $('#rpreview').textContent=resMessage();
+}
+function openReserve(){
+  if(!rform.nome&&form.nome) rform.nome=form.nome;
+  var tb=['round','square','long','any'].map(function(k){return '<button type="button" class="tbl" data-a="rtable" data-id="'+k+'" aria-label="Mesa '+MESAS[k].toLowerCase()+'">'+tblArt(k)+'<span>'+MESAS[k]+'</span></button>';}).join('');
+  var px=[1,2,3,4,5,6].map(function(n){return '<button type="button" class="pill" data-a="rpax" data-id="'+n+'">'+n+'</button>';}).join('')+'<button type="button" class="pill" data-a="rpax" data-id="7">7 ou mais</button>';
+  openSheet('reserve',
+   '<div class="sh"><h2>Reservar mesa</h2><button class="x" data-a="close">Fechar</button></div>'+
+   '<div class="rsec"><p class="lbl">Tipo de mesa</p><div class="tbl-grid">'+tb+'</div></div>'+
+   '<div class="rsec"><p class="lbl">Número de pessoas</p><div class="pax">'+px+'</div></div>'+
+   '<div class="f" id="r-moref" hidden><label for="r-mais">Quantas pessoas?</label><input id="r-mais" type="number" min="7" max="50" inputmode="numeric" value="'+rform.mais+'"></div>'+
+   '<div class="rsec"><p class="lbl">Data</p><div class="pax"><button type="button" class="pill" data-a="rday" data-id="0">Hoje</button><button type="button" class="pill" data-a="rday" data-id="1">Amanhã</button></div>'+
+   '<div class="two"><div class="f"><label for="r-data">Dia</label><input id="r-data" type="date" min="'+ymd(new Date())+'" max="'+ymd(addDays(90))+'" value="'+rform.data+'"></div>'+
+   '<div class="f"><label for="r-hora">Hora</label><select id="r-hora"></select></div></div></div>'+
+   '<div class="f"><label for="r-nome">O teu nome</label><input id="r-nome" autocomplete="given-name" value="'+esc(rform.nome)+'"></div>'+
+   '<div class="f"><label for="r-obs">Observações (opcional)</label><textarea id="r-obs" placeholder="Ex.: aniversário, cadeira de bebé">'+esc(rform.obs)+'</textarea></div>'+
+   '<details><summary>Ver a mensagem que será enviada</summary><pre id="rpreview"></pre></details>'+
+   '<p class="err" id="rerr"></p>'+
+   '<a id="rsend" class="send" target="_blank" rel="noopener">Pedir reserva pelo WhatsApp</a>'+
+   '<p class="note">A reserva só fica pedida quando enviares a mensagem no WhatsApp. O restaurante responde para confirmar.</p>');
+  fillTimes();
+  $('#r-data').addEventListener('input',function(e){rform.data=e.target.value;fillTimes();refreshRes();});
+  $('#r-hora').addEventListener('change',function(e){rform.hora=e.target.value;refreshRes();});
+  $('#r-mais').addEventListener('input',function(e){rform.mais=e.target.value;refreshRes();});
+  $('#r-nome').addEventListener('input',function(e){rform.nome=e.target.value;refreshRes();});
+  $('#r-obs').addEventListener('input',function(e){rform.obs=e.target.value;refreshRes();});
+  $('#rsend').onclick=function(e){
+    var err='';
+    if(!rform.data) err='Escolhe a data.';
+    else if(rform.data<ymd(new Date())) err='Essa data já passou. Escolhe outro dia.';
+    else if(!rform.hora) err='Escolhe a hora.';
+    else if(!rform.nome.trim()) err='Escreve o teu nome.';
+    $('#rerr').textContent=err;
+    if(err) e.preventDefault();
+  };
+  refreshRes();
 }
 
 function openLogin(){
@@ -709,6 +813,10 @@ document.addEventListener('click',function(e){
     case 'fnext': setFeat(featIdx+1);break;
     case 'fgo': setFeat(parseInt(t.getAttribute('data-i'),10)||0);break;
     case 'cart': openCart();break;
+    case 'reserve': openReserve();break;
+    case 'rtable': rform.mesa=id;refreshRes();break;
+    case 'rpax': rform.pessoas=parseInt(id,10);refreshRes();break;
+    case 'rday': rform.data=ymd(addDays(parseInt(id,10)));$('#r-data').value=rform.data;fillTimes();refreshRes();break;
     case 'close': closeSheet();break;
     case 'clear': cart={};render();break;
     case 'manage': manage();break;
