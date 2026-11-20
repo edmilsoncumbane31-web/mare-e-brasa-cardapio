@@ -584,7 +584,7 @@ function errorHTML(){
 
 function render(){
   renderChips();
-  $('#manage').textContent=edit?'':'Gerir cardápio';
+  var mg=$('#manage');mg.textContent='Gerir cardápio';mg.hidden=edit||!showManage();
   var mainEl=$('#main');
   mainEl.setAttribute('aria-busy',loading?'true':'false');
   if(loading){mainEl.innerHTML=skeleton();return;}
@@ -860,6 +860,7 @@ async function doLogin(){
       if(!(await isAdmin())){await sb.auth.signOut();er.textContent='Esta conta não tem permissão para gerir o cardápio.';btn.disabled=false;return;}
     }
     edit=true;
+    try{localStorage.setItem('mb_adm','1');}catch(e){}
     try{await load();}catch(e){}
     closeSheet();renderBar();render();
   }catch(e){
@@ -867,8 +868,15 @@ async function doLogin(){
     btn.disabled=false;
   }
 }
+function showManage(){
+  if(DEMO) return true;
+  try{if(location.hash==='#gerir'||localStorage.getItem('mb_adm')==='1') return true;}catch(e){}
+  return false;
+}
+window.addEventListener('hashchange',function(){if(!sheet)render();});
 async function manage(){
   if(!DEMO&&sb){
+    toast('A verificar o acesso…');
     try{
       var s=await sb.auth.getSession();
       if(s.data&&s.data.session&&await isAdmin()){edit=true;try{await load();}catch(e){}renderBar();render();return;}
@@ -878,6 +886,7 @@ async function manage(){
 }
 async function exitEdit(){
   edit=false;
+  try{localStorage.removeItem('mb_adm');}catch(e){}
   if(sb){try{await sb.auth.signOut();}catch(e){}}
   try{await load();}catch(e){}
   renderBar();render();
